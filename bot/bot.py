@@ -137,7 +137,7 @@ async def start_handle(update: Update, context: CallbackContext):
     reply_text += "\n🦄 Current model: {}".format(current_model)
 
     await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML)
-    # await show_chat_modes_handle(update, context)
+    await show_chat_modes_handle(update, context)
 
 
 async def help_handle(update: Update, context: CallbackContext):
