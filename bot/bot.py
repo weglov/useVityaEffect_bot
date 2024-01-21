@@ -627,8 +627,9 @@ async def error_handle(update: Update, context: CallbackContext) -> None:
 
 async def post_init(application: Application):
     await application.bot.set_my_commands([
+        BotCommand("/start", "Show rules"),
         BotCommand("/new", "Start new dialog"),
-        # BotCommand("/mode", "Select chat mode"),
+        BotCommand("/mode", "Select chat mode"),
         # BotCommand("/retry", "Re-generate response for previous query"),
         # BotCommand("/balance", "Show balance"),
         BotCommand("/settings", "Show settings"),
@@ -671,7 +672,7 @@ def run_bot() -> None:
 
     application.add_handler(MessageHandler(filters.VOICE & user_filter, voice_message_handle))
 
-    # application.add_handler(CommandHandler("mode", show_chat_modes_handle, filters=user_filter))
+    application.add_handler(CommandHandler("mode", show_chat_modes_handle, filters=user_filter))
     application.add_handler(CallbackQueryHandler(show_chat_modes_callback_handle, pattern="^show_chat_modes"))
     application.add_handler(CallbackQueryHandler(set_chat_mode_handle, pattern="^set_chat_mode"))
 
