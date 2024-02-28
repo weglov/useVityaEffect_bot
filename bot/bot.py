@@ -137,7 +137,8 @@ async def start_handle(update: Update, context: CallbackContext):
     reply_text += "\n🦄 Current model: {}".format(current_model)
 
     await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML)
-    await show_chat_modes_handle(update, context)
+    if config.enable_chat_modes:
+        await show_chat_modes_handle(update, context)
 
 
 async def help_handle(update: Update, context: CallbackContext):
@@ -187,18 +188,20 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
     if await is_previous_message_not_answered_yet(update, context): return
 
     user_id = update.message.from_user.id
-    chat_mode = db.get_user_attribute(user_id, "current_chat_mode")
+    if config.enable_chat_modes:
+        chat_mode = db.get_user_attribute(user_id, "current_chat_mode")
 
-    if chat_mode == "artist":
-        await generate_image_handle(update, context, message=message)
-        return
+        if chat_mode == "artist":
+            await generate_image_handle(update, context, message=message)
+            return
 
     async def message_handle_fn():
         # new dialog timeout
         if use_new_dialog_timeout:
             if (datetime.now() - db.get_user_attribute(user_id, "last_interaction")).seconds > config.new_dialog_timeout and len(db.get_dialog_messages(user_id)) > 0:
                 db.start_new_dialog(user_id)
-                await update.message.reply_text(f"Starting new dialog due to timeout (<b>{config.chat_modes[chat_mode]['name']}</b> mode) ✅", parse_mode=ParseMode.HTML)
+                if config.enable_chat_modes:
+                    await update.message.reply_text(f"Starting new dialog due to timeout (<b>{config.chat_modes[chat_mode]['name']}</b> mode) ✅", parse_mode=ParseMode.HTML)
         db.set_user_attribute(user_id, "last_interaction", datetime.now())
 
         # in case of CancelledError
@@ -217,19 +220,15 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
                  return
 
             dialog_messages = db.get_dialog_messages(user_id, dialog_id=None)
-            parse_mode = {
-                "html": ParseMode.HTML,
-                "markdown": ParseMode.MARKDOWN
-            }[config.chat_modes[chat_mode]["parse_mode"]]
+            parse_mode = ParseMode.HTML
 
             chatgpt_instance = openai_utils.ChatGPT(model=current_model)
             if config.enable_message_streaming:
-                gen = chatgpt_instance.send_message_stream(_message, dialog_messages=dialog_messages, chat_mode=chat_mode)
+                gen = chatgpt_instance.send_message_stream(_message, dialog_messages=dialog_messages)
             else:
                 answer, (n_input_tokens, n_output_tokens), n_first_dialog_messages_removed = await chatgpt_instance.send_message(
                     _message,
-                    dialog_messages=dialog_messages,
-                    chat_mode=chat_mode
+                    dialog_messages=dialog_messages
                 )
 
                 async def fake_gen():
@@ -385,8 +384,9 @@ async def new_dialog_handle(update: Update, context: CallbackContext):
     db.start_new_dialog(user_id)
     await update.message.reply_text("Starting new dialog ✅")
 
-    chat_mode = db.get_user_attribute(user_id, "current_chat_mode")
-    await update.message.reply_text(f"{config.chat_modes[chat_mode]['welcome_message']}", parse_mode=ParseMode.HTML)
+    if config.enable_chat_modes:
+        chat_mode = db.get_user_attribute(user_id, "current_chat_mode")
+        await update.message.reply_text(f"{config.chat_modes[chat_mode]['welcome_message']}", parse_mode=ParseMode.HTML)
 
 
 async def cancel_handle(update: Update, context: CallbackContext):
@@ -629,7 +629,7 @@ async def post_init(application: Application):
     await application.bot.set_my_commands([
         BotCommand("/start", "Show rules"),
         BotCommand("/new", "Start new dialog"),
-        BotCommand("/mode", "Select chat mode"),
+        BotCommand("/mode", "Select chat mode") if config.enable_chat_modes else BotCommand("/retry", "Re-generate response for previous query"),
         # BotCommand("/retry", "Re-generate response for previous query"),
         # BotCommand("/balance", "Show balance"),
         BotCommand("/settings", "Show settings"),
@@ -672,9 +672,10 @@ def run_bot() -> None:
 
     application.add_handler(MessageHandler(filters.VOICE & user_filter, voice_message_handle))
 
-    application.add_handler(CommandHandler("mode", show_chat_modes_handle, filters=user_filter))
-    application.add_handler(CallbackQueryHandler(show_chat_modes_callback_handle, pattern="^show_chat_modes"))
-    application.add_handler(CallbackQueryHandler(set_chat_mode_handle, pattern="^set_chat_mode"))
+    if config.enable_chat_modes:
+        application.add_handler(CommandHandler("mode", show_chat_modes_handle, filters=user_filter))
+        application.add_handler(CallbackQueryHandler(show_chat_modes_callback_handle, pattern="^show_chat_modes"))
+        application.add_handler(CallbackQueryHandler(set_chat_mode_handle, pattern="^set_chat_mode"))
 
     application.add_handler(CommandHandler("settings", settings_handle, filters=user_filter))
     application.add_handler(CallbackQueryHandler(set_settings_handle, pattern="^set_settings"))

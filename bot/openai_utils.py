@@ -21,7 +21,7 @@ OPENAI_COMPLETION_OPTIONS = {
 
 
 class ChatGPT:
-    def __init__(self, model="gpt-3.5-turbo"):
+    def __init__(self, model="gpt-4-1106-preview"):
         assert model in {"text-davinci-003", "gpt-3.5-turbo-16k", "gpt-3.5-turbo", "gpt-4", "gpt-4-1106-preview"}, f"Unknown model: {model}"
         self.model = model
 
@@ -118,8 +118,11 @@ class ChatGPT:
         yield "finished", answer, (n_input_tokens, n_output_tokens), n_first_dialog_messages_removed  # sending final answer
 
     def _generate_prompt(self, message, dialog_messages, chat_mode):
-        prompt = config.chat_modes[chat_mode]["prompt_start"]
-        prompt += "\n\n"
+        if config.enable_chat_modes:
+            prompt = config.chat_modes[chat_mode]["prompt_start"]
+            prompt += "\n\n"
+        else:
+            prompt = ''
 
         # add chat context
         if len(dialog_messages) > 0:
@@ -135,7 +138,10 @@ class ChatGPT:
         return prompt
 
     def _generate_prompt_messages(self, message, dialog_messages, chat_mode):
-        prompt = config.chat_modes[chat_mode]["prompt_start"]
+        if config.enable_chat_modes:
+            prompt = config.chat_modes[chat_mode]["prompt_start"]
+        else:
+            prompt = ''
 
         messages = [{"role": "system", "content": prompt}]
         for dialog_message in dialog_messages:
