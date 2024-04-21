@@ -115,10 +115,11 @@ class Database:
     def check_used_tokens_limit(self, user_id: int, model: str):
         n_used_tokens_dict = self.get_user_attribute(user_id, "n_used_tokens")
         
-        if "last_updated" not in n_used_tokens_dict[model]:
-            return False
 
         if model in n_used_tokens_dict:
+            if "last_updated" not in n_used_tokens_dict[model]:
+                return False
+        
             n_output_tokens = n_used_tokens_dict[model]["n_output_tokens"]
             limit = config.models["info"][model]["price_per_1000_output_tokens"] * (n_output_tokens / 1000)
             time_difference =  datetime.now() - n_used_tokens_dict[model]["last_updated"]
