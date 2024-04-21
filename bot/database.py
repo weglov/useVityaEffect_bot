@@ -2,7 +2,10 @@ from typing import Optional, Any
 
 import pymongo
 import uuid
-from datetime import datetime
+import logging
+from datetime import datetime, timedelta
+import pdb
+
 
 import config
 
@@ -99,13 +102,37 @@ class Database:
         if model in n_used_tokens_dict:
             n_used_tokens_dict[model]["n_input_tokens"] += n_input_tokens
             n_used_tokens_dict[model]["n_output_tokens"] += n_output_tokens
+            n_used_tokens_dict[model]["last_updated"] = datetime.now()
         else:
             n_used_tokens_dict[model] = {
                 "n_input_tokens": n_input_tokens,
-                "n_output_tokens": n_output_tokens
+                "n_output_tokens": n_output_tokens,
+                "last_updated": datetime.now()
             }
 
         self.set_user_attribute(user_id, "n_used_tokens", n_used_tokens_dict)
+
+    def check_used_tokens_limit(self, user_id: int, model: str):
+        n_used_tokens_dict = self.get_user_attribute(user_id, "n_used_tokens")
+
+        if model in n_used_tokens_dict:
+            n_output_tokens = n_used_tokens_dict[model]["n_output_tokens"]
+            limit = config.models["info"][model]["price_per_1000_output_tokens"] * (n_output_tokens / 1000)
+            time_difference =  datetime.now() - n_used_tokens_dict[model]["last_updated"]
+            
+            if limit > 0.5:
+                if time_difference < timedelta(days=1):
+                    return False
+                else:
+                    n_used_tokens_dict[model] = {
+                    "n_input_tokens": 0,
+                    "n_output_tokens": 0,
+                    "last_updated": datetime.now()
+                    }
+                    self.set_user_attribute(user_id, "n_used_tokens", n_used_tokens_dict)
+                    return True
+
+        return True
 
     def get_dialog_messages(self, user_id: int, dialog_id: Optional[str] = None):
         self.check_if_user_exists(user_id, raise_exception=True)

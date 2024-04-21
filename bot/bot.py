@@ -124,6 +124,17 @@ async def check_membership(update: Update, context: CallbackContext):
 
     return True
 
+async def check_limit_token(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+    current_model = db.get_user_attribute(user_id, "current_model")
+    isEnabled = db.check_used_tokens_limit(user_id, current_model)
+    if not isEnabled:
+        text = "<pre>Исчерпан лимит токенов для этой модели <b>({})</b>. Восстановление доступа произойдет через 24 часа. Доступ к другим моделям сохраняется, поскольку вы не превысили установленные лимиты для них. </pre> \n Выбрать другие модели /settings".format(current_model)
+        await context.bot.send_message(update.effective_chat.id, text, parse_mode=ParseMode.HTML)
+        return False
+
+    return True
+
 async def start_handle(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update, context, update.message.from_user)
     user_id = update.message.from_user.id
@@ -167,6 +178,9 @@ async def retry_handle(update: Update, context: CallbackContext):
 
 async def message_handle(update: Update, context: CallbackContext, message=None, use_new_dialog_timeout=True):
     if (not await check_membership(update, context)):
+        return
+    
+    if (not await check_limit_token(update, context)):
         return
 
     # check if bot was mentioned (for group chats)
