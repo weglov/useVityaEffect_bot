@@ -124,17 +124,17 @@ class Database:
             limit = config.models["info"][model]["price_per_1000_output_tokens"] * (n_output_tokens / 1000)
             time_difference =  datetime.now() - n_used_tokens_dict[model]["last_updated"]
             
-            if limit > 0.5:
-                if time_difference < timedelta(days=1):
-                    return False
-                else:
-                    n_used_tokens_dict[model] = {
-                    "n_input_tokens": 0,
-                    "n_output_tokens": 0,
-                    "last_updated": datetime.now()
-                    }
-                    self.set_user_attribute(user_id, "n_used_tokens", n_used_tokens_dict)
-                    return True
+            if time_difference < timedelta(days=1):
+                return limit < 0.3
+            else:
+                n_used_tokens_dict[model] = {
+                "n_input_tokens": 0,
+                "n_output_tokens": 0,
+                "last_updated": datetime.now()
+                }
+                self.set_user_attribute(user_id, "n_used_tokens", n_used_tokens_dict)
+                return True
+
 
         return True
 
