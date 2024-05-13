@@ -19,7 +19,7 @@ OPENAI_COMPLETION_OPTIONS = {
 
 
 class ChatGPT:
-    def __init__(self, model="gpt-3.5-turbo"):
+    def __init__(self, model="gpt-4o"):
         assert model in available_models, f"Unknown model: {model}"
         self.model = model
 
@@ -138,6 +138,7 @@ class ChatGPT:
             print("Warning: model not found. Using cl100k_base encoding.")
             encoding = tiktoken.get_encoding("cl100k_base")
         if model in {
+            "gpt-3.5-turbo",
             "gpt-3.5-turbo-0613",
             "gpt-3.5-turbo-16k-0613",
             "gpt-4-0314",
