@@ -114,6 +114,11 @@ async def is_bot_mentioned(update: Update, context: CallbackContext):
 
 
 async def check_membership(update: Update, context: CallbackContext):
+    if update.message is None or update.message.from_user is None:
+        text = "Invalid update, no user information available."
+        await context.bot.send_message(update.effective_chat.id, text)
+        return False
+
     userMembership = await context.bot.getChatMember(chat_id=config.allowed_channel, user_id=update.message.from_user.id)
     
     if (userMembership.status not in (ChatMemberStatus.MEMBER, ChatMemberStatus.OWNER)): 
