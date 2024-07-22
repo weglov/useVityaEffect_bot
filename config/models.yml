@@ -58,8 +58,8 @@ info:
     name: GPT-4o
     description: GPT-4o new flagship model that can reason across audio, vision, and text in real time.
 
-    price_per_1000_input_tokens: 0.008
-    price_per_1000_output_tokens: 0.025
+    price_per_1000_input_tokens: 0.004
+    price_per_1000_output_tokens: 0.012
 
     scores:
       smart: 5
