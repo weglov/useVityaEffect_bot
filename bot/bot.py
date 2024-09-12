@@ -113,6 +113,15 @@ async def is_bot_mentioned(update: Update, context: CallbackContext):
          return False
 
 
+async def check_bot_model(update: Update, context: CallbackContext):
+    if update.message is None or update.message.from_user is None:
+        return  
+    user_id = update.message.from_user.id
+    current_model = db.get_user_attribute(user_id, "current_model")
+    
+    if (current_model not in config.models["available_text_models"]):
+        db.set_user_attribute(user_id, "current_model", config.models["available_text_models"][0])
+
 async def check_membership(update: Update, context: CallbackContext):
     if update.message is None or update.message.from_user is None:
         text = "Invalid update, no user information available."
@@ -184,6 +193,8 @@ async def retry_handle(update: Update, context: CallbackContext):
 async def message_handle(update: Update, context: CallbackContext, message=None, use_new_dialog_timeout=True):
     if (not await check_membership(update, context)):
         return
+    
+    check_bot_model(update, context)
     
     if (not await check_limit_token(update, context)):
         return
