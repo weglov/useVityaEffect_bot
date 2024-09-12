@@ -113,8 +113,7 @@ class Database:
         self.set_user_attribute(user_id, "n_used_tokens", n_used_tokens_dict)
 
     def check_used_tokens_limit(self, user_id: int, model: str):
-        n_used_tokens_dict = self.get_user_attribute(user_id, "n_used_tokens")
-        
+        n_used_tokens_dict = self.get_user_attribute(user_id, "n_used_tokens")        
 
         if model in n_used_tokens_dict:
             if "last_updated" not in n_used_tokens_dict[model]:

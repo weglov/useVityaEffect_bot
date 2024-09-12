@@ -113,14 +113,14 @@ async def is_bot_mentioned(update: Update, context: CallbackContext):
          return False
 
 
-async def check_bot_model(update: Update, context: CallbackContext):
+def check_bot_model(update: Update, context: CallbackContext):
     if update.message is None or update.message.from_user is None:
         return  
     user_id = update.message.from_user.id
     current_model = db.get_user_attribute(user_id, "current_model")
 
     if (current_model not in config.models["available_text_models"]):
-        await db.set_user_attribute(user_id, "current_model", config.models["available_text_models"][0])
+        db.set_user_attribute(user_id, "current_model", config.models["available_text_models"][0])
 
 async def check_membership(update: Update, context: CallbackContext):
     if update.message is None or update.message.from_user is None:
@@ -194,7 +194,7 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
     if (not await check_membership(update, context)):
         return
     
-    await check_bot_model(update, context)
+    check_bot_model(update, context)
     
     if (not await check_limit_token(update, context)):
         return
