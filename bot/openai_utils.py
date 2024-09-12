@@ -19,13 +19,13 @@ OPENAI_COMPLETION_OPTIONS = {
 
 
 class ChatGPT:
-    def __init__(self, model="gpt-4o"):
+    def __init__(self, model="gpt-4o-mini"):
         assert model in available_models, f"Unknown model: {model}"
         self.model = model
 
     async def send_message(self, message, dialog_messages=[], chat_mode="assistant"):
-        if self.model != "gpt-4o":
-            self.model = "gpt-4o"
+        if self.model != "gpt-4o-mini":
+            self.model = "gpt-4o-mini"
 
         if chat_mode not in config.chat_modes.keys():
             raise ValueError(f"Chat mode {chat_mode} is not supported")
@@ -150,14 +150,15 @@ class ChatGPT:
             "gpt-4-32k-0613",
             "gpt-4-turbo",
             "gpt-4",
-            "gpt-4o"
+            "gpt-4o",
+            "gpt-4o-mini",
             }:
             tokens_per_message = 3
             tokens_per_name = 1
         elif model == "gpt-4-turbo":
             tokens_per_message = 3
             tokens_per_name = 1
-        elif model == "gpt-4o":
+        elif model == "gpt-4o-mini":
             tokens_per_message = 3
             tokens_per_name = 1
         else:
