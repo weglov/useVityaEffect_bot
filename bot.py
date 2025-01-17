@@ -305,6 +305,19 @@ async def handle_message(message: types.Message):
 
         # Отменяем отправку статуса typing
         typing_task.cancel()
+
+        posthog.capture(
+            str(user_id),
+            "message_sent",
+            properties={
+                "bot": "useGPTEffect",
+                "tokens": len(accumulated_message),
+                "user_id": user_id,
+                "message_length": len(user_text),
+                "message_type": "voice" if (message.voice or message.video_note) else "text"
+            }
+        )
+
         logger.info(f"Completed message generation for user {user_id}")
         
         # Сохраняем контекст и сообщение в базу данных
