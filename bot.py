@@ -28,6 +28,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 MONGODB_URL = os.getenv("MONGODB_URL")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 CONTEXT_TIMEOUT = 180 
+SUPPORT_BOT = os.getenv("SUPPORT_BOT", "@useVityaEffect")
 
 # Инициализация PostHog
 posthog.api_key = os.getenv("POSTHOG_API_KEY")
@@ -194,6 +195,26 @@ async def new_command(message: types.Message):
     
     await message.answer("🆕 Starting new dialog ✅", parse_mode='Markdown')
 
+@dp.message(Command("help"))
+async def help_command(message: types.Message):
+    user_id = message.from_user.id
+    logger.info(f"Help command received from user {user_id}")
+    
+    if not await check_channel_subscription(user_id, message):
+        return
+    
+    help_text = f"🔧 *Need help or found a bug?*\n\nIf something isn't working properly or you have questions, feel free to contact our support: {SUPPORT_BOT}\n\nWe'll be happy to help! 🤝"
+    
+    posthog.capture(
+        str(user_id),
+        "help_command",
+        properties={
+            "username": message.from_user.username
+        }
+    )
+    
+    await message.answer(help_text, parse_mode='Markdown')
+
 @dp.message()
 async def handle_message(message: types.Message):
     user_id = message.from_user.id
@@ -306,6 +327,20 @@ async def send_typing(chat_id: int):
 
 async def main():
     logger.info("Starting bot...")
+    
+    # Устанавливаем команды бота
+    commands = [
+        types.BotCommand(command="start", description="Start the bot and get welcome message"),
+        types.BotCommand(command="new", description="Start new conversation (clear context)"),
+        types.BotCommand(command="help", description="Get help and support information")
+    ]
+    
+    try:
+        await bot.set_my_commands(commands)
+        logger.info("Bot commands have been set successfully")
+    except Exception as e:
+        logger.error(f"Error setting bot commands: {e}")
+    
     asyncio.create_task(clean_old_contexts())
     await dp.start_polling(bot)
 
