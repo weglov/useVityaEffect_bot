@@ -140,6 +140,25 @@ async def transcribe_audio(file_path: str) -> str:
         os.unlink(file_path)
         logger.info(f"Temporary file deleted: {file_path}")
 
+async def update_user_if_not_exists(user_id: int, username: str, first_name: str):
+    # Проверяем, существует ли пользователь
+    existing_user = await users_collection.find_one({"user_id": user_id})
+    if not existing_user:
+        logger.info(f"Adding new user to database: {user_id}")
+        await users_collection.insert_one({
+            "user_id": user_id,
+            "username": username,
+            "first_name": first_name,
+            "created_at": datetime.now(),
+            "last_active": datetime.now()
+        })
+    else:
+        # Обновляем только last_active
+        await users_collection.update_one(
+            {"user_id": user_id},
+            {"$set": {"last_active": datetime.now()}}
+        )
+
 @dp.message(Command("start"))
 async def start_command(message: types.Message):
     user_id = message.from_user.id
@@ -148,6 +167,8 @@ async def start_command(message: types.Message):
     if not await check_channel_subscription(user_id, message):
         return
 
+    await update_user_if_not_exists(user_id, message.from_user.username, message.from_user.first_name)
+
     posthog.capture(
         str(user_id),
         "bot_start",
@@ -155,18 +176,6 @@ async def start_command(message: types.Message):
             "username": message.from_user.username,
             "first_name": message.from_user.first_name
         }
-    )
-
-    await users_collection.update_one(
-        {"user_id": user_id},
-        {
-            "$set": {
-                "username": message.from_user.username,
-                "first_name": message.from_user.first_name,
-                "last_active": datetime.now()
-            }
-        },
-        upsert=True
     )
     
     await message.answer("Hi! I'm ChatGPT bot implemented for @useVityaEffect subscribers 🤖\n🎤 You can send Voice Messages instead of text\n🦄 Current model: gpt-4o", parse_mode='Markdown')
@@ -178,6 +187,8 @@ async def new_command(message: types.Message):
     
     if not await check_channel_subscription(user_id, message):
         return
+    
+    await update_user_if_not_exists(user_id, message.from_user.username, message.from_user.first_name)
     
     # Сбрасываем контекст пользователя
     if user_id in user_contexts:
@@ -203,6 +214,8 @@ async def help_command(message: types.Message):
     if not await check_channel_subscription(user_id, message):
         return
     
+    await update_user_if_not_exists(user_id, message.from_user.username, message.from_user.first_name)
+    
     help_text = f"🔧 *Need help or found a bug?*\n\nIf something isn't working properly or you have questions, feel free to contact our support: {SUPPORT_BOT}\n\nWe'll be happy to help! 🤝"
     
     posthog.capture(
@@ -222,6 +235,8 @@ async def handle_message(message: types.Message):
     
     if not await check_channel_subscription(user_id, message):
         return
+
+    await update_user_if_not_exists(user_id, message.from_user.username, message.from_user.first_name)
 
     # Обработка голосовых сообщений и видео-кружков
     if message.voice or message.video_note:
