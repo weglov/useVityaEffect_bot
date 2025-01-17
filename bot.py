@@ -66,7 +66,8 @@ async def check_channel_subscription(user_id: int, message: types.Message = None
                 "bot_start_without_subscription",
                 properties={
                     "username": message.from_user.username,
-                    "first_name": message.from_user.first_name
+                    "first_name": message.from_user.first_name,
+                    "bot": "useGPTEffect"
                 }
             )
             await message.answer("Please subscribe to our channel @useVityaEffect to use the bot in full functionality.")
@@ -174,7 +175,8 @@ async def start_command(message: types.Message):
         "bot_start",
         properties={
             "username": message.from_user.username,
-            "first_name": message.from_user.first_name
+            "first_name": message.from_user.first_name,
+            "bot": "useGPTEffect"
         }
     )
     
@@ -200,7 +202,8 @@ async def new_command(message: types.Message):
         str(user_id),
         "new_conversation",
         properties={
-            "username": message.from_user.username
+            "username": message.from_user.username,
+            "bot": "useGPTEffect"
         }
     )
     
@@ -222,7 +225,8 @@ async def help_command(message: types.Message):
         str(user_id),
         "help_command",
         properties={
-            "username": message.from_user.username
+            "username": message.from_user.username,
+            "bot": "useGPTEffect"
         }
     )
     
@@ -338,7 +342,8 @@ async def handle_message(message: types.Message):
             "error_occurred",
             properties={
                 "error_type": type(e).__name__,
-                "error_message": str(e)
+                "error_message": str(e),
+                "bot": "useGPTEffect"
             }
         )
         await message.answer("Извините, произошла ошибка. Попробуйте позже.")
