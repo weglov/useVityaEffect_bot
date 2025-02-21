@@ -269,7 +269,7 @@ async def handle_message(message: types.Message):
 
     try:
         # Отправляем начальное сообщение
-        bot_message = await message.answer("...", parse_mode='Markdown')
+        bot_message = await message.answer("...")
         
         # Создаем задачу для отправки статуса typing
         typing_task = asyncio.create_task(send_typing(message.chat.id))
@@ -286,26 +286,43 @@ async def handle_message(message: types.Message):
 
         accumulated_message = ""
         buffer = ""  # Буфер для накопления частей сообщения
+        streaming_enabled = True  # Флаг для управления стримингом
         
         async for chunk in stream:
             if chunk.choices[0].delta.content:
                 buffer += chunk.choices[0].delta.content
                 accumulated_message += chunk.choices[0].delta.content
                 
-                # Обновляем сообщение каждые 30 символов или когда получаем знак пунктуации
-                if len(buffer) >= 30 or any(p in buffer for p in ['.', '!', '?', '\n']):
+                # Обновляем сообщение только если стриминг включен
+                if streaming_enabled and (len(buffer) >= 100 or any(p in buffer for p in ['.', '!', '?', '\n'])):
                     try:
-                        await bot_message.edit_text(accumulated_message, parse_mode='Markdown')
+                        await bot_message.edit_text(accumulated_message)
                         buffer = ""  # Очищаем буфер после обновления
                     except Exception as e:
-                        logger.error(f"Error updating message: {e}")
+                        if "Flood control exceeded" in str(e):
+                            await message.answer(str(e))
+                            logger.warning(f"Flood control exceeded for user {user_id}, disabling streaming")
+                            streaming_enabled = False  # Отключаем стриминг при ошибке флуда
+                        else:
+                            logger.error(f"Error updating message: {e}")
 
-        # Отправляем финальное сообщение, если в буфере что-то осталось
+        # Отправляем финальное сообщение с Markdown
         if accumulated_message:
             try:
-                await bot_message.edit_text(accumulated_message, parse_mode='Markdown')
+                if not streaming_enabled:
+                    # Если стриминг был отключен, добавляем задержку
+                    await asyncio.sleep(30)
+                    await bot_message.delete()
+                    await message.answer(accumulated_message, parse_mode='Markdown')
+                else:
+                    await bot_message.edit_text(accumulated_message, parse_mode='Markdown')
             except Exception as e:
-                logger.error(f"Error sending final message: {e}")
+                logger.error(f"Error sending final message with Markdown: {e}")
+                # Если не получилось отправить с Markdown, отправляем без форматирования
+                try:
+                    await bot_message.edit_text(accumulated_message)
+                except Exception as e:
+                    logger.error(f"Error sending final message without formatting: {e}")
 
         # Отменяем отправку статуса typing
         typing_task.cancel()
