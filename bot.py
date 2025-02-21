@@ -294,7 +294,7 @@ async def handle_message(message: types.Message):
                 accumulated_message += chunk.choices[0].delta.content
                 
                 # Обновляем сообщение только если стриминг включен
-                if streaming_enabled and (len(buffer) >= 100 or any(p in buffer for p in ['.', '!', '?', '\n'])):
+                if streaming_enabled and (len(buffer) >= 100):
                     try:
                         await bot_message.edit_text(accumulated_message)
                         buffer = ""  # Очищаем буфер после обновления
@@ -312,7 +312,6 @@ async def handle_message(message: types.Message):
                 if not streaming_enabled:
                     # Если стриминг был отключен, добавляем задержку
                     await asyncio.sleep(30)
-                    await bot_message.delete()
                     await message.answer(accumulated_message, parse_mode='Markdown')
                 else:
                     await bot_message.edit_text(accumulated_message, parse_mode='Markdown')
