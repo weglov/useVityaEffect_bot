@@ -8,7 +8,7 @@ import logging
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from dotenv import load_dotenv
-from motor.motor_asyncio import AsyncIOMotorClient
+# Removed MongoDB import
 from openai import AsyncOpenAI
 import posthog
 
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 # Конфигурация
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-MONGODB_URL = os.getenv("MONGODB_URL")
+# MONGODB_URL no longer needed
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 CONTEXT_TIMEOUT = 180 
 SUPPORT_BOT = os.getenv("SUPPORT_BOT", "@useVityaEffect")
@@ -42,12 +42,7 @@ dp = Dispatcher()
 # Инициализация OpenAI
 openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
-# Подключение к MongoDB
-mongo_client = AsyncIOMotorClient(MONGODB_URL)
-db = mongo_client.chatbot
-users_collection = db.users
-conversations_collection = db.conversations
-
+# In-memory storage only
 # Хранение контекста пользователей в памяти
 user_contexts: Dict[int, Dict] = {}
 
@@ -141,24 +136,9 @@ async def transcribe_audio(file_path: str) -> str:
         os.unlink(file_path)
         logger.info(f"Temporary file deleted: {file_path}")
 
-async def update_user_if_not_exists(user_id: int, username: str, first_name: str):
-    # Проверяем, существует ли пользователь
-    existing_user = await users_collection.find_one({"user_id": user_id})
-    if not existing_user:
-        logger.info(f"Adding new user to database: {user_id}")
-        await users_collection.insert_one({
-            "user_id": user_id,
-            "username": username,
-            "first_name": first_name,
-            "created_at": datetime.now(),
-            "last_active": datetime.now()
-        })
-    else:
-        # Обновляем только last_active
-        await users_collection.update_one(
-            {"user_id": user_id},
-            {"$set": {"last_active": datetime.now()}}
-        )
+async def update_user_stats(user_id: int, username: str, first_name: str):
+    # Just log user activity without storing in database
+    logger.info(f"User activity: {user_id}, username: {username}, first_name: {first_name}")
 
 @dp.message(Command("start"))
 async def start_command(message: types.Message):
@@ -168,7 +148,7 @@ async def start_command(message: types.Message):
     if not await check_channel_subscription(user_id, message):
         return
 
-    await update_user_if_not_exists(user_id, message.from_user.username, message.from_user.first_name)
+    await update_user_stats(user_id, message.from_user.username, message.from_user.first_name)
 
     posthog.capture(
         str(user_id),
@@ -190,7 +170,7 @@ async def new_command(message: types.Message):
     if not await check_channel_subscription(user_id, message):
         return
     
-    await update_user_if_not_exists(user_id, message.from_user.username, message.from_user.first_name)
+    await update_user_stats(user_id, message.from_user.username, message.from_user.first_name)
     
     # Сбрасываем контекст пользователя
     if user_id in user_contexts:
@@ -217,7 +197,7 @@ async def help_command(message: types.Message):
     if not await check_channel_subscription(user_id, message):
         return
     
-    await update_user_if_not_exists(user_id, message.from_user.username, message.from_user.first_name)
+    await update_user_stats(user_id, message.from_user.username, message.from_user.first_name)
     
     help_text = f"🔧 *Need help or found a bug?*\n\nIf something isn't working properly or you have questions, feel free to contact our support: {SUPPORT_BOT}\n\nWe'll be happy to help! 🤝"
     
@@ -240,7 +220,7 @@ async def handle_message(message: types.Message):
     if not await check_channel_subscription(user_id, message):
         return
 
-    await update_user_if_not_exists(user_id, message.from_user.username, message.from_user.first_name)
+    await update_user_stats(user_id, message.from_user.username, message.from_user.first_name)
 
     # Обработка голосовых сообщений и видео-кружков
     if message.voice or message.video_note:
@@ -340,16 +320,9 @@ async def handle_message(message: types.Message):
 
         logger.info(f"Completed message generation for user {user_id}")
         
-        # Сохраняем контекст и сообщение в базу данных
+        # Сохраняем контекст только в памяти
         context.append({"role": "assistant", "content": accumulated_message})
-        await conversations_collection.insert_one({
-            "user_id": user_id,
-            "user_message": user_text,
-            "bot_response": accumulated_message,
-            "timestamp": datetime.now(),
-            "message_type": "voice" if (message.voice or message.video_note) else "text"
-        })
-        logger.info(f"Conversation saved to database for user {user_id}")
+        logger.info(f"Conversation context updated in memory for user {user_id}")
 
     except Exception as e:
         logger.error(f"Error processing message: {e}", exc_info=True)
@@ -394,4 +367,4 @@ async def main():
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    asyncio.run(main())
