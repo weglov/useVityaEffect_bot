@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Optional
 import tempfile
 import logging
+import re
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
@@ -139,6 +140,27 @@ async def transcribe_audio(file_path: str) -> str:
 async def update_user_stats(user_id: int, username: str, first_name: str):
     # Just log user activity without storing in database
     logger.info(f"User activity: {user_id}, username: {username}, first_name: {first_name}")
+
+async def retry_with_backoff(func, *args, max_retries=3, initial_delay=1, **kwargs):
+    delay = initial_delay
+    for attempt in range(max_retries):
+        try:
+            return await func(*args, **kwargs)
+        except Exception as e:
+            if "Flood control exceeded" in str(e) or "Too Many Requests" in str(e):
+                if attempt == max_retries - 1:
+                    raise
+                
+                # Extract retry time from error message
+                retry_match = re.search(r"retry after (\d+)", str(e))
+                if retry_match:
+                    delay = int(retry_match.group(1))
+                
+                logger.warning(f"Flood control hit, waiting {delay} seconds before retry {attempt + 1}/{max_retries}")
+                await asyncio.sleep(delay)
+                delay *= 2  # Exponential backoff
+            else:
+                raise
 
 @dp.message(Command("start"))
 async def start_command(message: types.Message):
@@ -292,16 +314,35 @@ async def handle_message(message: types.Message):
                 if not streaming_enabled:
                     # Если стриминг был отключен, добавляем задержку
                     await asyncio.sleep(30)
-                    await message.answer(accumulated_message, parse_mode='Markdown')
+                    await retry_with_backoff(
+                        message.answer,
+                        accumulated_message,
+                        parse_mode='Markdown'
+                    )
                 else:
-                    await bot_message.edit_text(accumulated_message, parse_mode='Markdown')
+                    await retry_with_backoff(
+                        bot_message.edit_text,
+                        accumulated_message,
+                        parse_mode='Markdown'
+                    )
             except Exception as e:
                 logger.error(f"Error sending final message with Markdown: {e}")
                 # Если не получилось отправить с Markdown, отправляем без форматирования
                 try:
-                    await bot_message.edit_text(accumulated_message)
+                    await retry_with_backoff(
+                        bot_message.edit_text,
+                        accumulated_message
+                    )
                 except Exception as e:
                     logger.error(f"Error sending final message without formatting: {e}")
+                    # В крайнем случае, пробуем отправить новое сообщение
+                    try:
+                        await retry_with_backoff(
+                            message.answer,
+                            accumulated_message
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to send message after all retries: {e}")
 
         # Отменяем отправку статуса typing
         typing_task.cancel()
