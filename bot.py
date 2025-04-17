@@ -30,6 +30,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 CONTEXT_TIMEOUT = 180 
 SUPPORT_BOT = os.getenv("SUPPORT_BOT", "@useVityaEffect")
+GPT_MODEL = os.getenv("GPT_MODEL", "gpt-4.1")  # Используем переменную окружения с fallback на gpt-4.1
 
 # Инициализация PostHog
 posthog.api_key = os.getenv("POSTHOG_API_KEY")
@@ -182,7 +183,7 @@ async def start_command(message: types.Message):
         }
     )
     
-    await message.answer("Hi! I'm ChatGPT bot implemented for @useVityaEffect subscribers 🤖\n🎤 You can send Voice Messages instead of text\n🦄 Current model: gpt-4o", parse_mode='Markdown')
+    await message.answer(f"Hi! I'm ChatGPT bot implemented for @useVityaEffect subscribers 🤖\n🎤 You can send Voice Messages instead of text\n🦄 Current model: {GPT_MODEL}", parse_mode='Markdown')
 
 @dp.message(Command("new"))
 async def new_command(message: types.Message):
@@ -279,7 +280,7 @@ async def handle_message(message: types.Message):
         logger.info(f"Starting OpenAI stream for user {user_id}")
         # Создаем стрим
         stream = await openai_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=GPT_MODEL,
             temperature=0.7,
             max_tokens=2000,
             messages=context,
