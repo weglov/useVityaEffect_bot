@@ -55,8 +55,9 @@ func (b *Bot) checkChannelSubscription(userID int64, chatID int64) bool {
 
 	var member tgbotapi.ChatMember
 	var err error
-	
+
 	if parsedID, parseErr := strconv.ParseInt(b.config.ChannelID, 10, 64); parseErr == nil {
+		// Use numeric chat ID
 		member, err = b.tg.GetChatMember(tgbotapi.GetChatMemberConfig{
 			ChatConfigWithUser: tgbotapi.ChatConfigWithUser{
 				ChatID: parsedID,
@@ -64,12 +65,15 @@ func (b *Bot) checkChannelSubscription(userID int64, chatID int64) bool {
 			},
 		})
 	} else {
-		member, err = b.tg.GetChatMember(tgbotapi.GetChatMemberConfig{
+		// For string channel IDs (usernames), we need to use the SuperGroupUsername field
+		// or handle it as a string-based chat identifier
+		getChatMemberConfig := tgbotapi.GetChatMemberConfig{
 			ChatConfigWithUser: tgbotapi.ChatConfigWithUser{
-				ChatID: b.config.ChannelID,
-				UserID: userID,
+				UserID:             userID,
+				SuperGroupUsername: b.config.ChannelID,
 			},
-		})
+		}
+		member, err = b.tg.GetChatMember(getChatMemberConfig)
 	}
 	if err != nil {
 		log.Printf("Error getting chat member: %v", err)
@@ -135,7 +139,7 @@ func (b *Bot) cleanOldContexts(ctx context.Context) {
 }
 
 func (b *Bot) logActivity(userID int64, username, firstName, event string) {
-	log.Printf("User activity - ID: %d, Username: %s, FirstName: %s, Event: %s", 
+	log.Printf("User activity - ID: %d, Username: %s, FirstName: %s, Event: %s",
 		userID, username, firstName, event)
 }
 
