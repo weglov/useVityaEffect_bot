@@ -45,9 +45,6 @@ func NewBot(config Config) (*Bot, error) {
 }
 
 func (b *Bot) checkChannelSubscription(userID int64, chatID int64) bool {
-	// Временно отключаем проверку подписки
-	return true
-
 	if b.config.EnvMode == "development" {
 		return true
 	}
@@ -56,19 +53,24 @@ func (b *Bot) checkChannelSubscription(userID int64, chatID int64) bool {
 		return true
 	}
 
-	var channelID interface{}
-	if parsedID, err := strconv.ParseInt(b.config.ChannelID, 10, 64); err == nil {
-		channelID = parsedID
+	var member tgbotapi.ChatMember
+	var err error
+	
+	if parsedID, parseErr := strconv.ParseInt(b.config.ChannelID, 10, 64); parseErr == nil {
+		member, err = b.tg.GetChatMember(tgbotapi.GetChatMemberConfig{
+			ChatConfigWithUser: tgbotapi.ChatConfigWithUser{
+				ChatID: parsedID,
+				UserID: userID,
+			},
+		})
 	} else {
-		channelID = b.config.ChannelID
+		member, err = b.tg.GetChatMember(tgbotapi.GetChatMemberConfig{
+			ChatConfigWithUser: tgbotapi.ChatConfigWithUser{
+				ChatID: b.config.ChannelID,
+				UserID: userID,
+			},
+		})
 	}
-
-	member, err := b.tg.GetChatMember(tgbotapi.GetChatMemberConfig{
-		ChatConfigWithUser: tgbotapi.ChatConfigWithUser{
-			ChatID: channelID,
-			UserID: userID,
-		},
-	})
 	if err != nil {
 		log.Printf("Error getting chat member: %v", err)
 		return false
