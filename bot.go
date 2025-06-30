@@ -45,6 +45,9 @@ func NewBot(config Config) (*Bot, error) {
 }
 
 func (b *Bot) checkChannelSubscription(userID int64, chatID int64) bool {
+	// Временно отключаем проверку подписки
+	return true
+
 	if b.config.EnvMode == "development" {
 		return true
 	}
@@ -53,10 +56,11 @@ func (b *Bot) checkChannelSubscription(userID int64, chatID int64) bool {
 		return true
 	}
 
-	channelID, err := strconv.ParseInt(b.config.ChannelID, 10, 64)
-	if err != nil {
-		log.Printf("Error parsing channel ID: %v", err)
-		return false
+	var channelID interface{}
+	if parsedID, err := strconv.ParseInt(b.config.ChannelID, 10, 64); err == nil {
+		channelID = parsedID
+	} else {
+		channelID = b.config.ChannelID
 	}
 
 	member, err := b.tg.GetChatMember(tgbotapi.GetChatMemberConfig{

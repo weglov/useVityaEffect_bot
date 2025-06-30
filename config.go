@@ -22,7 +22,7 @@ func LoadConfig() (Config, error) {
 	config := Config{
 		BotToken:     os.Getenv("BOT_TOKEN"),
 		OpenAIAPIKey: os.Getenv("OPENAI_API_KEY"),
-		ChannelID:    os.Getenv("CHANNEL_ID"),
+		ChannelID:    getEnv("CHANNEL_ID", ""),
 		SupportBot:   getEnv("SUPPORT_BOT", "@useVityaEffect"),
 		GPTModel:     getEnv("GPT_MODEL", "gpt-4o"),
 		EnvMode:      getEnv("ENV_MODE", "production"),
