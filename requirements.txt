@@ -1,6 +1,0 @@
-aiogram==3.17.0
-openai==1.75.0
-python-dotenv==1.0.0
-motor==3.6.1
-pymongo==4.9.0
-posthog==3.8.3 
