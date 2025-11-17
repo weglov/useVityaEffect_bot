@@ -24,7 +24,7 @@ func LoadConfig() (Config, error) {
 		OpenAIAPIKey: os.Getenv("OPENAI_API_KEY"),
 		ChannelID:    getEnv("CHANNEL_ID", ""),
 		SupportBot:   getEnv("SUPPORT_BOT", "@useVityaEffect"),
-		GPTModel:     getEnv("GPT_MODEL", "gpt-4o"),
+		GPTModel:     getEnv("GPT_MODEL", "gpt-5.1"),
 		EnvMode:      getEnv("ENV_MODE", "production"),
 	}
 
