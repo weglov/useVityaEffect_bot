@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -119,12 +120,22 @@ func (b *Bot) handleMessage(update tgbotapi.Update) {
 
 	log.Printf("Starting OpenAI streaming request for user %d", userID)
 
+	const (
+		defaultTemperature = 0.7
+		maxTokensLimit     = 2000
+	)
+
 	req := openai.ChatCompletionRequest{
-		Model:       b.config.GPTModel,
-		Messages:    userContext.Messages,
-		Temperature: 0.7,
-		MaxTokens:   2000,
-		Stream:      true,
+		Model:    b.config.GPTModel,
+		Messages: userContext.Messages,
+		Stream:   true,
+	}
+
+	if isReasoningModel(b.config.GPTModel) {
+		req.MaxCompletionTokens = maxTokensLimit
+	} else {
+		req.MaxTokens = maxTokensLimit
+		req.Temperature = defaultTemperature
 	}
 
 	stream, err := b.openai.CreateChatCompletionStream(context.Background(), req)
@@ -212,4 +223,12 @@ func (b *Bot) handleMessage(update tgbotapi.Update) {
 		fmt.Sprintf("message_sent_%s", messageType))
 
 	log.Printf("Completed message generation for user %d", userID)
+}
+
+func isReasoningModel(model string) bool {
+	m := strings.ToLower(model)
+	return strings.HasPrefix(m, "gpt-5") ||
+		strings.HasPrefix(m, "o1") ||
+		strings.HasPrefix(m, "o3") ||
+		strings.HasPrefix(m, "o4")
 }
