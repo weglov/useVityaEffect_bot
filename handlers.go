@@ -77,6 +77,10 @@ func (b *Bot) handleMessage(update tgbotapi.Update) {
 	if update.Message.Voice != nil || update.Message.VideoNote != nil {
 		log.Printf("Processing voice/video message from user %d", userID)
 
+		// Показываем typing сразу при получении голосового
+		action := tgbotapi.NewChatAction(update.Message.Chat.ID, tgbotapi.ChatTyping)
+		b.tg.Send(action)
+
 		var fileID string
 		if update.Message.Voice != nil {
 			fileID = update.Message.Voice.FileID
@@ -91,6 +95,9 @@ func (b *Bot) handleMessage(update tgbotapi.Update) {
 			b.tg.Send(msg)
 			return
 		}
+
+		// Обновляем typing перед транскрипцией
+		b.tg.Send(tgbotapi.NewChatAction(update.Message.Chat.ID, tgbotapi.ChatTyping))
 
 		userText, err = b.transcribeAudio(audioPath)
 		if err != nil {
@@ -118,7 +125,7 @@ func (b *Bot) handleMessage(update tgbotapi.Update) {
 	action := tgbotapi.NewChatAction(update.Message.Chat.ID, tgbotapi.ChatTyping)
 	b.tg.Send(action)
 
-	log.Printf("Starting OpenAI streaming request for user %d", userID)
+	log.Printf("Starting OpenRouter streaming request for user %d", userID)
 
 	const (
 		defaultTemperature = 0.7
@@ -140,7 +147,7 @@ func (b *Bot) handleMessage(update tgbotapi.Update) {
 
 	stream, err := b.openai.CreateChatCompletionStream(context.Background(), req)
 	if err != nil {
-		log.Printf("Error creating OpenAI completion stream: %v", err)
+		log.Printf("Error creating OpenRouter completion stream: %v", err)
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Извините, произошла ошибка. Попробуйте позже.")
 		b.tg.Send(msg)
 		return

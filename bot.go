@@ -32,7 +32,10 @@ func NewBot(config Config) (*Bot, error) {
 		return nil, fmt.Errorf("failed to create telegram bot: %w", err)
 	}
 
-	openaiClient := openai.NewClient(config.OpenAIAPIKey)
+	// Configure OpenRouter client (OpenAI-compatible API)
+	openaiConfig := openai.DefaultConfig(config.OpenRouterAPIKey)
+	openaiConfig.BaseURL = "https://openrouter.ai/api/v1"
+	openaiClient := openai.NewClientWithConfig(openaiConfig)
 
 	bot := &Bot{
 		tg:           tg,

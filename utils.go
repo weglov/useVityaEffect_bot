@@ -1,7 +1,9 @@
 package main
 
 import (
-	"context"
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -13,7 +15,6 @@ import (
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/sashabaranov/go-openai"
 )
 
 func (b *Bot) downloadVoiceMessage(fileID string) (string, error) {
@@ -56,25 +57,80 @@ func (b *Bot) transcribeAudio(filePath string) (string, error) {
 	log.Printf("Starting audio transcription for file: %s", filePath)
 	defer os.Remove(filePath)
 
-	file, err := os.Open(filePath)
+	// Read and encode audio file to base64
+	audioData, err := os.ReadFile(filePath)
 	if err != nil {
-		return "", fmt.Errorf("error opening file: %w", err)
+		return "", fmt.Errorf("error reading audio file: %w", err)
 	}
-	defer file.Close()
+	audioBase64 := base64.StdEncoding.EncodeToString(audioData)
 
-	req := openai.AudioRequest{
-		Model:    openai.Whisper1,
-		FilePath: filePath,
-		Language: "ru",
+	// Prepare multimodal request for OpenRouter
+	dataURL := "data:audio/ogg;base64," + audioBase64
+	requestBody := map[string]interface{}{
+		"model": b.config.TranscriptionModel,
+		"messages": []map[string]interface{}{
+			{
+				"role": "user",
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": "Transcribe this audio to text. Output ONLY the transcribed text in the original language, nothing else.",
+					},
+					{
+						"type": "image_url",
+						"image_url": map[string]string{
+							"url": dataURL,
+						},
+					},
+				},
+			},
+		},
 	}
 
-	resp, err := b.openai.CreateTranscription(context.Background(), req)
+	jsonBody, err := json.Marshal(requestBody)
 	if err != nil {
-		return "", fmt.Errorf("error during audio transcription: %w", err)
+		return "", fmt.Errorf("error marshaling request: %w", err)
 	}
 
+	req, err := http.NewRequest("POST", "https://openrouter.ai/api/v1/chat/completions", bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return "", fmt.Errorf("error creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+b.config.OpenRouterAPIKey)
+
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("error sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("error decoding response: %w", err)
+	}
+
+	if len(result.Choices) == 0 {
+		return "", fmt.Errorf("no transcription result")
+	}
+
+	transcription := strings.TrimSpace(result.Choices[0].Message.Content)
 	log.Println("Audio transcription completed successfully")
-	return resp.Text, nil
+	return transcription, nil
 }
 
 func (b *Bot) retryWithBackoff(fn func() error, maxRetries int) error {
