@@ -4,34 +4,35 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"strings"
 	"time"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/sashabaranov/go-openai"
 )
 
-func (b *Bot) handleStart(update tgbotapi.Update) {
-	userID := update.Message.From.ID
+func (b *Bot) handleStart(update gotgbot.Update) {
+	userID := update.Message.From.Id
 	log.Printf("Start command received from user %d", userID)
 
-	if !b.checkChannelSubscription(userID, update.Message.Chat.ID) {
+	if !b.checkChannelSubscription(userID, update.Message.Chat.Id) {
 		return
 	}
 
-	b.logActivity(userID, update.Message.From.UserName, update.Message.From.FirstName, "bot_start")
+	b.logActivity(userID, update.Message.From.Username, update.Message.From.FirstName, "bot_start")
 
 	text := fmt.Sprintf("Hi! I'm ChatGPT bot implemented for @useVityaEffect subscribers 🤖\n🎤 You can send Voice Messages instead of text\n🦄 Current model: %s", b.config.GPTModel)
-	msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
-	msg.ParseMode = "Markdown"
-	b.tg.Send(msg)
+	b.tg.SendMessage(update.Message.Chat.Id, text, &gotgbot.SendMessageOpts{
+		ParseMode: "Markdown",
+	})
 }
 
-func (b *Bot) handleNew(update tgbotapi.Update) {
-	userID := update.Message.From.ID
+func (b *Bot) handleNew(update gotgbot.Update) {
+	userID := update.Message.From.Id
 	log.Printf("New command received from user %d", userID)
 
-	if !b.checkChannelSubscription(userID, update.Message.Chat.ID) {
+	if !b.checkChannelSubscription(userID, update.Message.Chat.Id) {
 		return
 	}
 
@@ -41,34 +42,34 @@ func (b *Bot) handleNew(update tgbotapi.Update) {
 	userContext.LastUpdate = time.Now()
 	userContext.mu.Unlock()
 
-	b.logActivity(userID, update.Message.From.UserName, update.Message.From.FirstName, "new_conversation")
+	b.logActivity(userID, update.Message.From.Username, update.Message.From.FirstName, "new_conversation")
 
-	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "🆕 Starting new dialog ✅")
-	msg.ParseMode = "Markdown"
-	b.tg.Send(msg)
+	b.tg.SendMessage(update.Message.Chat.Id, "🆕 Starting new dialog ✅", &gotgbot.SendMessageOpts{
+		ParseMode: "Markdown",
+	})
 }
 
-func (b *Bot) handleHelp(update tgbotapi.Update) {
-	userID := update.Message.From.ID
+func (b *Bot) handleHelp(update gotgbot.Update) {
+	userID := update.Message.From.Id
 	log.Printf("Help command received from user %d", userID)
 
-	if !b.checkChannelSubscription(userID, update.Message.Chat.ID) {
+	if !b.checkChannelSubscription(userID, update.Message.Chat.Id) {
 		return
 	}
 
-	b.logActivity(userID, update.Message.From.UserName, update.Message.From.FirstName, "help_command")
+	b.logActivity(userID, update.Message.From.Username, update.Message.From.FirstName, "help_command")
 
 	text := fmt.Sprintf("🔧 *Need help or found a bug?*\n\nIf something isn't working properly or you have questions, feel free to contact our support: %s\n\nWe'll be happy to help! 🤝", b.config.SupportBot)
-	msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
-	msg.ParseMode = "Markdown"
-	b.tg.Send(msg)
+	b.tg.SendMessage(update.Message.Chat.Id, text, &gotgbot.SendMessageOpts{
+		ParseMode: "Markdown",
+	})
 }
 
-func (b *Bot) handleMessage(update tgbotapi.Update) {
-	userID := update.Message.From.ID
+func (b *Bot) handleMessage(update gotgbot.Update) {
+	userID := update.Message.From.Id
 	log.Printf("Received message from user %d", userID)
 
-	if !b.checkChannelSubscription(userID, update.Message.Chat.ID) {
+	if !b.checkChannelSubscription(userID, update.Message.Chat.Id) {
 		return
 	}
 
@@ -77,33 +78,28 @@ func (b *Bot) handleMessage(update tgbotapi.Update) {
 	if update.Message.Voice != nil || update.Message.VideoNote != nil {
 		log.Printf("Processing voice/video message from user %d", userID)
 
-		// Показываем typing сразу при получении голосового
-		action := tgbotapi.NewChatAction(update.Message.Chat.ID, tgbotapi.ChatTyping)
-		b.tg.Send(action)
+		b.tg.SendChatAction(update.Message.Chat.Id, "typing", nil)
 
 		var fileID string
 		if update.Message.Voice != nil {
-			fileID = update.Message.Voice.FileID
+			fileID = update.Message.Voice.FileId
 		} else {
-			fileID = update.Message.VideoNote.FileID
+			fileID = update.Message.VideoNote.FileId
 		}
 
 		audioPath, err := b.downloadVoiceMessage(fileID)
 		if err != nil {
 			log.Printf("Error downloading voice message: %v", err)
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Sorry, I couldn't process your voice message.")
-			b.tg.Send(msg)
+			b.tg.SendMessage(update.Message.Chat.Id, "Sorry, I couldn't process your voice message.", nil)
 			return
 		}
 
-		// Обновляем typing перед транскрипцией
-		b.tg.Send(tgbotapi.NewChatAction(update.Message.Chat.ID, tgbotapi.ChatTyping))
+		b.tg.SendChatAction(update.Message.Chat.Id, "typing", nil)
 
 		userText, err = b.transcribeAudio(audioPath)
 		if err != nil {
 			log.Printf("Error transcribing audio: %v", err)
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Sorry, I couldn't process your voice message.")
-			b.tg.Send(msg)
+			b.tg.SendMessage(update.Message.Chat.Id, "Sorry, I couldn't process your voice message.", nil)
 			return
 		}
 
@@ -121,9 +117,7 @@ func (b *Bot) handleMessage(update tgbotapi.Update) {
 	userContext.LastUpdate = time.Now()
 	userContext.mu.Unlock()
 
-	// Показываем typing
-	action := tgbotapi.NewChatAction(update.Message.Chat.ID, tgbotapi.ChatTyping)
-	b.tg.Send(action)
+	b.tg.SendChatAction(update.Message.Chat.Id, "typing", nil)
 
 	log.Printf("Starting OpenRouter streaming request for user %d", userID)
 
@@ -148,23 +142,17 @@ func (b *Bot) handleMessage(update tgbotapi.Update) {
 	stream, err := b.openai.CreateChatCompletionStream(context.Background(), req)
 	if err != nil {
 		log.Printf("Error creating OpenRouter completion stream: %v", err)
-		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Извините, произошла ошибка. Попробуйте позже.")
-		b.tg.Send(msg)
+		b.tg.SendMessage(update.Message.Chat.Id, "Извините, произошла ошибка. Попробуйте позже.", nil)
 		return
 	}
 	defer stream.Close()
 
-	// Отправляем первое пустое сообщение для последующего редактирования
-	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "...")
-	sentMsg, err := b.tg.Send(msg)
-	if err != nil {
-		log.Printf("Error sending initial message: %v", err)
-		return
-	}
+	chatID := update.Message.Chat.Id
+	draftID := int64(rand.Intn(999999) + 1)
 
 	var responseText string
-	var lastEditTime time.Time
-	const editThrottleInterval = 500 * time.Millisecond
+	var lastDraftTime time.Time
+	const draftThrottleInterval = 300 * time.Millisecond
 
 	for {
 		response, err := stream.Recv()
@@ -179,37 +167,22 @@ func (b *Bot) handleMessage(update tgbotapi.Update) {
 		if len(response.Choices) > 0 && response.Choices[0].Delta.Content != "" {
 			responseText += response.Choices[0].Delta.Content
 
-			// Редактируем сообщение с ограничением частоты
-			if time.Since(lastEditTime) > editThrottleInterval {
-				editMsg := tgbotapi.NewEditMessageText(
-					update.Message.Chat.ID,
-					sentMsg.MessageID,
-					responseText,
-				)
-				editMsg.ParseMode = "Markdown"
-				_, editErr := b.tg.Send(editMsg)
-				if editErr != nil {
-					// Если не получилось с Markdown, пробуем без форматирования
-					editMsg.ParseMode = ""
-					b.tg.Send(editMsg)
+			if time.Since(lastDraftTime) > draftThrottleInterval {
+				if _, draftErr := b.tg.SendMessageDraft(chatID, draftID, responseText, nil); draftErr != nil {
+					log.Printf("Error sending message draft: %v", draftErr)
 				}
-				lastEditTime = time.Now()
+				lastDraftTime = time.Now()
 			}
 		}
 	}
 
-	// Финальное редактирование с полным текстом
+	// Отправляем финальное сообщение (заменяет черновик)
 	if responseText != "" {
-		editMsg := tgbotapi.NewEditMessageText(
-			update.Message.Chat.ID,
-			sentMsg.MessageID,
-			responseText,
-		)
-		editMsg.ParseMode = "Markdown"
-		_, err = b.tg.Send(editMsg)
+		_, err = b.tg.SendMessage(chatID, responseText, &gotgbot.SendMessageOpts{
+			ParseMode: "Markdown",
+		})
 		if err != nil {
-			editMsg.ParseMode = ""
-			b.tg.Send(editMsg)
+			b.tg.SendMessage(chatID, responseText, nil)
 		}
 	}
 
@@ -226,7 +199,7 @@ func (b *Bot) handleMessage(update tgbotapi.Update) {
 		messageType = "voice"
 	}
 
-	b.logActivity(userID, update.Message.From.UserName, update.Message.From.FirstName,
+	b.logActivity(userID, update.Message.From.Username, update.Message.From.FirstName,
 		fmt.Sprintf("message_sent_%s", messageType))
 
 	log.Printf("Completed message generation for user %d", userID)

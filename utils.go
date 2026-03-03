@@ -13,14 +13,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func (b *Bot) downloadVoiceMessage(fileID string) (string, error) {
 	log.Printf("Downloading voice message with file_id: %s", fileID)
 
-	file, err := b.tg.GetFile(tgbotapi.FileConfig{FileID: fileID})
+	file, err := b.tg.GetFile(fileID, nil)
 	if err != nil {
 		return "", fmt.Errorf("error getting file: %w", err)
 	}
